@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Windows.Forms;
 using UDPCOMMON;
 
@@ -71,6 +72,25 @@ namespace UDPNATCLIENT
         private void button6_Click(object sender, EventArgs e)
         {
             listBox2.Items.Clear();
+        }
+
+        private void btn_sendfile_Click(object sender, EventArgs e)
+        {
+            using (FileStream fsRead = new FileStream(@"D:\1.txt", FileMode.Open))
+            {
+                //剩余文件内容长度
+                long leftLength = fsRead.Length;
+                //buffersize 
+                int buffersize = 1024;
+                //创建缓存数组
+                byte[] buffer = new byte[buffersize];
+                int rNum = 0;
+                int FileStart = 0;
+
+            }
+            byte[] buffer = 
+            User user = listBox1.SelectedItem as User;
+            _client.SendMessageRaw(buffer, user);
         }
     }
 }

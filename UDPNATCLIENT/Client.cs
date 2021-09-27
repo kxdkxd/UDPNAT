@@ -274,5 +274,10 @@ namespace UDPNATCLIENT
             P2P_HolePunchingTestMessage confirmMessage = new P2P_HolePunchingTestMessage(_LocalUserName);
             SendMessage(confirmMessage, user);
         }
+
+        public void SendMessageRaw(byte[] b, User user)
+        {
+            _client.Send(b, b.Length, user.NetPoint);
+        }
     }
 }

@@ -43,6 +43,8 @@
             this.label5 = new System.Windows.Forms.Label();
             this.button6 = new System.Windows.Forms.Button();
             this.listBox2 = new System.Windows.Forms.ListBox();
+            this.textBox3 = new System.Windows.Forms.TextBox();
+            this.btn_sendfile = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // label1
@@ -182,11 +184,30 @@
             this.listBox2.Size = new System.Drawing.Size(635, 220);
             this.listBox2.TabIndex = 1;
             // 
+            // textBox3
+            // 
+            this.textBox3.Location = new System.Drawing.Point(68, 464);
+            this.textBox3.Name = "textBox3";
+            this.textBox3.Size = new System.Drawing.Size(385, 21);
+            this.textBox3.TabIndex = 5;
+            // 
+            // btn_sendfile
+            // 
+            this.btn_sendfile.Location = new System.Drawing.Point(488, 461);
+            this.btn_sendfile.Name = "btn_sendfile";
+            this.btn_sendfile.Size = new System.Drawing.Size(75, 23);
+            this.btn_sendfile.TabIndex = 6;
+            this.btn_sendfile.Text = "sendFile";
+            this.btn_sendfile.UseVisualStyleBackColor = true;
+            this.btn_sendfile.Click += new System.EventHandler(this.btn_sendfile_Click);
+            // 
             // frmClient
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(665, 449);
+            this.ClientSize = new System.Drawing.Size(665, 523);
+            this.Controls.Add(this.btn_sendfile);
+            this.Controls.Add(this.textBox3);
             this.Controls.Add(this.button6);
             this.Controls.Add(this.button4);
             this.Controls.Add(this.button3);
@@ -228,6 +249,8 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Button button6;
         private System.Windows.Forms.ListBox listBox2;
+        private System.Windows.Forms.TextBox textBox3;
+        private System.Windows.Forms.Button btn_sendfile;
     }
 }
 
