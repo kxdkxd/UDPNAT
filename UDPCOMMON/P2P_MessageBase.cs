@@ -71,6 +71,37 @@ namespace UDPCOMMON
         }
     }
 
+    [Serializable]
+    public class P2P_FileBlockMessage : P2P_MessageBase
+    {
+        private readonly byte[] fileBlock;
+        private readonly ushort checksum;
+        private readonly int blockNum;
+        
+        public P2P_FileBlockMessage(byte[] fb, ushort cksum, int blockNum)
+        {
+            fileBlock = fb;
+            checksum = cksum;
+            this.blockNum = blockNum;
+        }
+
+        public byte[] FileBlock
+        {
+            get { return fileBlock; }
+        }
+
+        public ushort CheckSum
+        {
+            get { return checksum; }
+        }
+
+        public int BlockNum
+        {
+            get { return this.blockNum; }
+        }
+    }
+
+    
     #endregion
 
 }

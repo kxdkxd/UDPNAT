@@ -76,6 +76,31 @@ namespace UDPCOMMON
         }
     }
 
+    [Serializable]
+    public class S2C_FileBlockAckMessage : S2C_MessageBase
+    {
+        protected ushort checksum;
+
+        public S2C_FileBlockAckMessage(ushort cksum)
+        {
+            checksum = cksum;
+        }
+
+        public ushort CheckSum
+        {
+            get { return checksum; }
+        }
+    }
+
+    [Serializable]
+    public class S2C_AckReadytoSendFileMessage : S2C_MessageBase
+    {
+        public S2C_AckReadytoSendFileMessage()
+        {
+
+        }
+    }
+
     #endregion
 
 }

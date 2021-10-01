@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Net;
 
 namespace UDPCOMMON
 {
@@ -83,6 +84,38 @@ namespace UDPCOMMON
         public string ToUserName
         {
             get { return toUserName; }
+        }
+    }
+
+    [Serializable]
+    public class C2S_FileBlockAckMessage : C2S_MessageBase
+    {
+        private readonly ushort checksum;
+        protected IPEndPoint toUserIPEndPoint;
+
+        public C2S_FileBlockAckMessage(string fromUserName, IPEndPoint toUserIPEndPoint, ushort cksum): base(fromUserName)
+        {
+            checksum = cksum;
+            this.toUserIPEndPoint = toUserIPEndPoint;
+        }
+
+        public IPEndPoint ToUserIPEndPoint
+        {
+            get { return this.toUserIPEndPoint; }
+        }
+
+        public ushort CheckSum
+        {
+            get { return checksum; }
+        }
+    }
+
+    [Serializable]
+    public class C2S_ReadytoSendFileMessage : C2S_MessageBase
+    {
+        public C2S_ReadytoSendFileMessage(string fromUserName) : base(fromUserName)
+        {
+
         }
     }
 

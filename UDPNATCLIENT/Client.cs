@@ -18,13 +18,14 @@ namespace UDPNATCLIENT
         //private const int MAX_RETRY_SEND_MSG = 1; //打洞时连接次数,正常情况下一次就能成功 
 
         private readonly UdpClient _client;//客户端监听 
+        public readonly UdpClient _clientFileTransfer; // FileAckMessage Receiver Client
         private readonly IPEndPoint _hostPoint; //主机IP 
         private IPEndPoint _remotePoint; //接收任何远程机器的数据 
         private readonly UserCollection _userList;//在线用户列表 
         private readonly Thread _listenThread; //监听线程 
         private string _LocalUserName; //本地用户名 
         //private bool _HoleAccepted = false; //A->B,接收到B用户的确认消息 
-
+        
         private WriteLogHandle _OnWriteMessage;
         public WriteLogHandle OnWriteMessage
         {
@@ -43,10 +44,10 @@ namespace UDPNATCLIENT
         ///显示跟踪记录 
         /// </summary> 
         /// <param name="log"></param> 
-        private void DoWriteLog(string log)
+        public void DoWriteLog(string log)
         {
             if (_OnWriteMessage != null)
-                ((Control) _OnWriteMessage.Target).Invoke(_OnWriteMessage, log);
+                ((Control)_OnWriteMessage.Target).Invoke(_OnWriteMessage, log);
         }
 
         /// <summary> 
@@ -58,6 +59,7 @@ namespace UDPNATCLIENT
             _remotePoint = new IPEndPoint(IPAddress.Any, 0); //任何与本地连接的用户IP地址。 
             _hostPoint = new IPEndPoint(IPAddress.Parse(serverIP), Globals.SERVER_PORT); //服务器地址 
             _client = new UdpClient();//不指定端口，系统自动分配 
+            _clientFileTransfer = new UdpClient(12322); // 指定FileAckMessage的監聽端口
             _userList = new UserCollection();
             _listenThread = new Thread(Run);
         }
@@ -69,7 +71,7 @@ namespace UDPNATCLIENT
         private string GetServerIP()
         {
             string file = Application.StartupPath + "\\ip.ini";
-            string ip = File.ReadAllText(file);
+            string ip = "47.103.154.116";
             return ip.Trim();
         }
 
@@ -124,7 +126,7 @@ namespace UDPNATCLIENT
         private void DisplayUsers(UserCollection users)
         {
             if (_UserChangedHandle != null)
-                ((Control) _UserChangedHandle.Target).Invoke(_UserChangedHandle, users);
+                ((Control)_UserChangedHandle.Target).Invoke(_UserChangedHandle, users);
         }
 
         //运行线程 
@@ -203,6 +205,24 @@ namespace UDPNATCLIENT
                         P2P_TalkMessage workMsg = (P2P_TalkMessage)msgObj;
                         DoWriteLog(workMsg.Message);
                     }
+                    else if (msgType == typeof(P2P_FileBlockMessage))
+                    {
+                        string timestamp = FileUtils.GetTimeStamp();
+                        P2P_FileBlockMessage fbMsg = (P2P_FileBlockMessage)msgObj;
+                        //DoWriteLog(fbMsg.BlockNum.ToString() + " File Block Recvd");
+                        ushort cksum = Crc16.ComputeChecksum(fbMsg.FileBlock);
+                        if (fbMsg.CheckSum != cksum)
+                        {
+                            DoWriteLog("[W] - File Block Checksum Error! Num=" + fbMsg.BlockNum.ToString());
+                            FileUtils.write2File("!fileblock-" + fbMsg.BlockNum.ToString() + ".fblock", fbMsg.FileBlock);
+                        }
+                        else//normal block
+                        {
+                            FileUtils.write2File("fileblock-" + fbMsg.BlockNum.ToString() + ".fblock", fbMsg.FileBlock);
+                            C2S_FileBlockAckMessage msgAck = new C2S_FileBlockAckMessage(_LocalUserName, _remotePoint, cksum);
+                            SendMessage(msgAck, _hostPoint);
+                        }
+                    }
                     else
                     {
                         DoWriteLog("收到未知消息!");
@@ -236,7 +256,7 @@ namespace UDPNATCLIENT
             }
             catch
             {
-                
+
             }
         }
 
@@ -256,6 +276,22 @@ namespace UDPNATCLIENT
             DoWriteLog("消息已发送.");
         }
 
+        public void SendMessageNoLog(MessageBase msg, User user)//由於子綫程在發送過程中DoWriteLog會等待主綫程響應，若發生丟包則造成死鎖。
+        {
+            SendMessageNoLog(msg, user.NetPoint);
+        }
+
+        public void SendMessageNoLog(MessageBase msg, IPEndPoint remoteIP)//由於子綫程在發送過程中DoWriteLog會等待主綫程響應，若發生丟包則造成死鎖。
+        {
+            if (msg == null) return;
+            byte[] buffer = ObjectSerializer.Serialize(msg);
+            _client.Send(buffer, buffer.Length, remoteIP);
+        }
+
+        public void SendMessageToHost(MessageBase msg)
+        {
+            SendMessage(msg, _hostPoint);
+        }
         /// <summary> 
         /// UDP打洞过程 
         /// 假设A想连接B.首先A发送打洞消息给Server,让Server告诉B有人想与你建立通话通道,Server将A的IP信息转发给B 
@@ -268,16 +304,62 @@ namespace UDPNATCLIENT
             C2S_HolePunchingRequestMessage msg = new C2S_HolePunchingRequestMessage(_LocalUserName, user.UserName);
             SendMessage(msg, _hostPoint);
 
-            Thread.Sleep(2000);//等待对方发送UDP包并建立Session 
+            Thread.Sleep(3000);//等待对方发送UDP包并建立Session 
 
             //再向对方发送确认消息，如果对方收到会发送一个P2P_HolePunchingResponse确认消息，此时打洞成功 
             P2P_HolePunchingTestMessage confirmMessage = new P2P_HolePunchingTestMessage(_LocalUserName);
             SendMessage(confirmMessage, user);
         }
 
-        public void SendMessageRaw(byte[] b, User user)
+
+        private void CountDownResendFileBLock(object obj)
         {
-            _client.Send(b, b.Length, user.NetPoint);
+            Tuple<P2P_FileBlockMessage, User> tp = (Tuple<P2P_FileBlockMessage, User>)obj;
+            while (true)
+            {
+                Thread.Sleep(2000);
+                SendMessageNoLog(tp.Item1, tp.Item2);//避免因為丟包而造成Log輸出的死鎖
+            }
+        }
+              
+        /// <summary>
+        /// UDP发送文件快，将文件划分为块，并且对每个块传送的时候增加校验值。校验值不对发出警报并自动进行重传
+        /// </summary>
+        /// <param name="fileBlock"></param>
+        /// <param name="user"></param>
+        public void FileSending(byte[] fileBlock, User user, int blockNum)
+        {
+            P2P_FileBlockMessage msg = new P2P_FileBlockMessage(fileBlock, Crc16.ComputeChecksum(fileBlock), blockNum);
+            SendMessage(msg, user);//send block
+            Thread thread = new Thread(new ParameterizedThreadStart(this.CountDownResendFileBLock)); //setup a timeout re-send thread.
+            Tuple<P2P_FileBlockMessage, User> tp = Tuple.Create(msg, user);
+            thread.Start(tp);
+            byte[] buffer;//接受数据用
+            while (true)
+            {
+                buffer = _clientFileTransfer.Receive(ref _remotePoint);//Blocking until receive an ACK
+                object msgObj = ObjectSerializer.Deserialize(buffer);
+                Type msgType = msgObj.GetType();
+                DoWriteLog("接收到消息:" + msgType + " From:" + _remotePoint);
+                if (msgType == typeof(S2C_FileBlockAckMessage))
+                {
+                    S2C_FileBlockAckMessage m0 = (S2C_FileBlockAckMessage)msgObj;
+                    if(m0.CheckSum == msg.CheckSum)
+                    {
+                        thread.Abort();
+                        break;
+                    }
+                    else
+                    {
+                        DoWriteLog("Wrong Checksum Received. Resending FileBlock...");
+                    }
+                }
+                else
+                {
+                    DoWriteLog("Only P2P_FileBlockMessage is allowed. Back to Blocking for this ACK Message");
+                }
+                Thread.Sleep(1);
+            }
         }
     }
 }
